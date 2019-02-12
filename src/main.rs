@@ -42,7 +42,7 @@ fn get_server_port() -> u16 {
 fn main() {
     let mut router: Router = Router::new();
     router.get("/", hello, "index");
-    router.get("/uncc_campus", campus_response, "uncc_campus");
+    router.get("/name/uncc_campus", campus_response, "uncc_campus");
 
 
     Iron::new(router)
