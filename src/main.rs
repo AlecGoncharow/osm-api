@@ -31,6 +31,22 @@ fn campus_response(_: &mut Request) -> IronResult<Response> {
     Ok(resp)
 }
 
+// simple route to allow for quick prototyping
+fn charlotte_response(_: &mut Request) -> IronResult<Response> {
+    let mut file = match File::open("static/charlotte_nc.json") {
+        Ok(f) => f,
+        Err(e) => panic!("{:?}", e)
+    };
+    let mut contents = String::new();
+    file.read_to_string(&mut contents);
+    let mut resp = Response::new();
+    resp.body = Some(std::boxed::Box::new(contents));
+    resp.status = Some(status::Ok);
+    resp.headers.set(iron::headers::ContentType::json());
+
+    Ok(resp)
+}
+
 /// Look up our server port number in PORT, for compatibility with Heroku.
 fn get_server_port() -> u16 {
     env::var("PORT")
@@ -43,6 +59,7 @@ fn main() {
     let mut router: Router = Router::new();
     router.get("/", hello, "index");
     router.get("/name/uncc_campus", campus_response, "uncc_campus");
+    router.get("/name/charlotte", charlotte_response, "charlotte_nc");
 
 
     Iron::new(router)
