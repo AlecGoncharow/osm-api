@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 iron = "0.6.*"
 router = "*"
+mongodb = "0.3.11"
+bson = "0.13.0"

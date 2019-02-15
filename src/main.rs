@@ -1,11 +1,15 @@
 extern crate iron;
 extern crate router;
+extern crate mongodb;
 
+use mongodb::{Bson, bson, doc, Client, ThreadedClient, db::ThreadedDatabase};
 use std::env;
 use iron::{status, Iron, IronResult, Request, Response};
 use router::Router;
 use std::fs::File;
 use std::io::prelude::*;
+
+mod osm;
 
 
 // Serves a string to the user.  Try accessing "/".
@@ -22,7 +26,7 @@ fn campus_response(_: &mut Request) -> IronResult<Response> {
         Err(e) => panic!("{:?}", e)
     };
     let mut contents = String::new();
-    file.read_to_string(&mut contents);
+    file.read_to_string(&mut contents).ok();
     let mut resp = Response::new();
     resp.body = Some(std::boxed::Box::new(contents));
     resp.status = Some(status::Ok);
@@ -38,7 +42,7 @@ fn charlotte_response(_: &mut Request) -> IronResult<Response> {
         Err(e) => panic!("{:?}", e)
     };
     let mut contents = String::new();
-    file.read_to_string(&mut contents);
+    file.read_to_string(&mut contents).ok();
     let mut resp = Response::new();
     resp.body = Some(std::boxed::Box::new(contents));
     resp.status = Some(status::Ok);
@@ -55,12 +59,33 @@ fn get_server_port() -> u16 {
         .unwrap_or(8080)
 }
 
+fn get_db_port() -> u16 {
+    env::var("MONGO_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(27017)
+}
+
+fn get_db_uri() -> String {
+    env::var("MONGO_URI")
+        .ok()
+        .unwrap_or(String::from("localhost"))
+}
+
 fn main() {
     let mut router: Router = Router::new();
     router.get("/", hello, "index");
     router.get("/name/uncc_campus", campus_response, "uncc_campus");
     router.get("/name/charlotte", charlotte_response, "charlotte_nc");
+    let client = Client::connect(&get_db_uri(), get_db_port())
+           .expect("Failed to initialize standalone client");
 
+    router.get(
+        "/mongo/name/:name",
+        move |request: &mut Request| osm::handle_request(request, &client),
+        "osm_name"
+    );
+    
 
     Iron::new(router)
         .http(("0.0.0.0", get_server_port()))
