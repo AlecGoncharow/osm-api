@@ -1,7 +1,16 @@
-use mongodb::{bson, doc, Client, ThreadedClient, db::ThreadedDatabase};
+use mongodb::{bson, doc, Client, ThreadedClient, db::ThreadedDatabase, db::Database};
 use iron::{status, IronResult, Request, Response};
 use router::Router;
 use std::env;
+
+fn get_db(client: &Client) -> Database {
+    let name = get_db_name();
+    let db = client.db(&name);
+    if name != "test" {
+        db.auth(&get_db_user(), &get_db_pass()).expect("error logging into to database");
+    }
+    db
+}
 
 fn get_db_name() -> String {
     env::var("MONGODB_NAME")
@@ -9,10 +18,22 @@ fn get_db_name() -> String {
         .unwrap_or(String::from("test"))
 }
 
+fn get_db_user() -> String {
+    env::var("MLAB_USER")
+        .ok()
+        .unwrap_or(String::from("test"))
+}
+
+fn get_db_pass() -> String {
+    env::var("MLAB_PW")
+        .ok()
+        .unwrap_or(String::from("test"))
+}
+
 pub fn handle_request(request: &mut Request, client: &Client) -> IronResult<Response> {
     let params = request.extensions.get::<Router>().expect("Error getting router");
     let name = params.find("name").expect("missing parameter in router");
-    let cities = client.db(&get_db_name()).collection("cities");
+    let cities = get_db(client).collection("cities");
 
     let doc = doc! {
         "meta.name": name

@@ -62,14 +62,14 @@ fn get_server_port() -> u16 {
 }
 
 fn get_db_port() -> u16 {
-    env::var("MONGODB_PORT")
+    env::var("MLAB_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(27017)
 }
 
-fn get_db_uri() -> String {
-    env::var("MONGODB_URI")
+fn get_db_host() -> String {
+    env::var("MLAB_HOST")
         .ok()
         .unwrap_or(String::from("localhost"))
 }
@@ -80,15 +80,9 @@ fn main() {
     router.get("/name/uncc_campus", campus_response, "uncc_campus");
     router.get("/name/charlotte", charlotte_response, "charlotte_nc");
 
-    let uri = get_db_uri();
 
-    let client= if uri == "localhost" {
-        Client::connect(&uri, get_db_port())
-            .expect("Failed to initialize standalone client")
-    } else {
-        Client::with_uri(&uri)
-            .expect("Failed to initalize standalone client")
-    };
+    let client = Client::connect(&get_db_host(), get_db_port())
+            .expect("Failed to initialize standalone client");
 
     router.get(
         "/mongo/name/:name",
