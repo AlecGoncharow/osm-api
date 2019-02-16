@@ -1,8 +1,10 @@
 extern crate iron;
 extern crate router;
 extern crate mongodb;
+extern crate serde;
+extern crate serde_json;
 
-use mongodb::{Bson, bson, doc, Client, ThreadedClient, db::ThreadedDatabase};
+use mongodb::{Client, ThreadedClient};
 use std::env;
 use iron::{status, Iron, IronResult, Request, Response};
 use router::Router;
@@ -60,14 +62,14 @@ fn get_server_port() -> u16 {
 }
 
 fn get_db_port() -> u16 {
-    env::var("MONGO_PORT")
+    env::var("MONGODB_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(27017)
 }
 
 fn get_db_uri() -> String {
-    env::var("MONGO_URI")
+    env::var("MONGODB_URI")
         .ok()
         .unwrap_or(String::from("localhost"))
 }
@@ -77,8 +79,16 @@ fn main() {
     router.get("/", hello, "index");
     router.get("/name/uncc_campus", campus_response, "uncc_campus");
     router.get("/name/charlotte", charlotte_response, "charlotte_nc");
-    let client = Client::connect(&get_db_uri(), get_db_port())
-           .expect("Failed to initialize standalone client");
+
+    let uri = get_db_uri();
+
+    let client= if uri == "localhost" {
+        Client::connect(&uri, get_db_port())
+            .expect("Failed to initialize standalone client")
+    } else {
+        Client::with_uri(&uri)
+            .expect("Failed to initalize standalone client")
+    };
 
     router.get(
         "/mongo/name/:name",
