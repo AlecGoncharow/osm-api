@@ -44,8 +44,8 @@ pub fn handle_request(request: &mut Request, client: &Client) -> IronResult<Resp
     let mut resp = Response::new();
     match item {
         Some(Ok(doc)) => {
-            let json_value = serde_json::to_value(&doc).expect("error casting bson into value");
-            resp.body = Some(Box::new(json_value.to_string()));
+            let json_value = serde_json::to_string(&doc).expect("error casting bson into string");
+            resp.body = Some(Box::new(json_value));
             resp.status = Some(status::Ok);
             resp.headers.set(iron::headers::ContentType::json());
         }
