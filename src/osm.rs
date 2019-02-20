@@ -6,7 +6,7 @@ use std::env;
 fn get_db(client: &Client) -> Database {
     let name = get_db_name();
     let db = client.db(&name);
-    if name != "test" {
+    if name != "osm" {
         db.auth(&get_db_user(), &get_db_pass()).expect("error logging into to database");
     }
     db
@@ -15,7 +15,7 @@ fn get_db(client: &Client) -> Database {
 fn get_db_name() -> String {
     env::var("MONGODB_NAME")
         .ok()
-        .unwrap_or(String::from("test"))
+        .unwrap_or(String::from("osm"))
 }
 
 fn get_db_user() -> String {
@@ -35,7 +35,7 @@ pub fn handle_request(request: &mut Request, client: &Client) -> IronResult<Resp
     let name = params.find("name").expect("missing parameter in router");
     let cities = get_db(client).collection("cities");
 
-    let doc = doc! {
+    let mut doc = doc! {
         "meta.name": name
     };
 
@@ -54,8 +54,22 @@ pub fn handle_request(request: &mut Request, client: &Client) -> IronResult<Resp
             resp.status = Some(status::InternalServerError);
         },
         None => {
-            resp.body = Some(Box::new("404 not found"));
-            resp.status = Some(status::NotFound);
+            doc = doc! {
+                "meta.name": name.to_lowercase()
+            };
+            let find = cities.find_one(Some(doc), None).ok().expect("failed to execute find lower");
+            match find {
+                Some(doc) => {
+                    let json_value = serde_json::to_string(&doc).expect("error casting bson into string");
+                    resp.body = Some(Box::new(json_value));
+                    resp.status = Some(status::Ok);
+                    resp.headers.set(iron::headers::ContentType::json());
+                }
+                None => {
+                    resp.body = Some(Box::new("404 not found"));
+                    resp.status = Some(status::NotFound);
+                }
+            }
         }
     }
 
