@@ -1,7 +1,13 @@
-use mongodb::{bson, doc, Client, ThreadedClient, db::ThreadedDatabase, db::Database};
+use mongodb::{Bson, bson, doc, Client, ThreadedClient, db::ThreadedDatabase, db::Database};
 use iron::{status, IronResult, Request, Response};
 use router::Router;
 use std::env;
+
+
+#[derive(Serialize, Deserialize)]
+struct Data {
+    names: Vec<String>,
+}
 
 fn get_db(client: &Client) -> Database {
     let name = get_db_name();
@@ -60,4 +66,49 @@ pub fn handle_request(request: &mut Request, client: &Client) -> IronResult<Resp
     }
 
     Ok(resp)
+}
+
+pub fn list_cities(_: &mut Request, client: &Client) -> IronResult<Response> {
+    let cities = get_db(client).collection("cities");
+
+    let mut resp = Response::new();
+    resp.status = Some(status::Ok);
+    resp.headers.set(iron::headers::ContentType::json());
+    let filter = doc! {
+        "meta.name": 1
+    };
+    let mut find_options = mongodb::coll::options::FindOptions::new();
+    find_options.projection = Some(filter);
+    let cursor = cities.find(None, Some(find_options)).ok().expect("Failed to execute find");
+
+    let valid_names: Vec<String> = cursor.map(|item|
+        match item {
+            Ok(doc) => {
+                match doc.get("meta") {
+                    Some(&Bson::Document(ref meta)) => {
+                        match meta.get("name") {
+                            Some(&Bson::String(ref name)) => {
+                                println!("{:?}", name);
+                                name.clone()
+                            }
+                            None => String::from(""),
+                            _ => panic!("Malformed meta data")
+                        }
+                    }
+                    _ => panic!("Malformed data")
+                }
+            }
+            Err(_) => {
+                resp.body = Some(Box::new("server error"));
+                resp.status = Some(status::InternalServerError);
+                panic!("server broke");
+            },
+        }
+        ).collect();
+    let data = Data{
+        names: valid_names
+    };
+    let json_value = serde_json::to_string(&data).expect("error serializing names");
+    resp.body = Some(Box::new(json_value));
+    return Ok(resp)
 }

@@ -3,6 +3,8 @@ extern crate router;
 extern crate mongodb;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 use mongodb::{Client, ThreadedClient};
 use std::env;
@@ -41,16 +43,25 @@ fn get_db_host() -> String {
 fn main() {
     let mut router: Router = Router::new();
     router.get("/", hello, "index");
-
-    let client = Client::connect(&get_db_host(), get_db_port())
+    {
+        let client = Client::connect(&get_db_host(), get_db_port())
+            .expect("Failed to initialize standalone client");
+        router.get(
+            "/name_list",
+            move |request: &mut Request| osm::list_cities(request, &client),
+            "osm_list"
+        );
+    }
+    {
+        let client = Client::connect(&get_db_host(), get_db_port())
             .expect("Failed to initialize standalone client");
 
-    router.get(
-        "/name/:name",
-        move |request: &mut Request| osm::handle_request(request, &client),
-        "osm_name"
-    );
-    
+        router.get(
+            "/name/:name",
+            move |request: &mut Request| osm::handle_request(request, &client),
+            "osm_name"
+        );
+    }
 
     Iron::new(router)
         .http(("0.0.0.0", get_server_port()))
